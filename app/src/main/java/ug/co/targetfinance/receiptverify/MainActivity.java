@@ -288,14 +288,8 @@ public class MainActivity extends Activity {
         formTitle.setTextColor(deepNavy);
         formTitle.setTextSize(18);
         formTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        formTitle.setPadding(0, 0, 0, dp(14));
         form.addView(formTitle);
-
-        TextView formHint = new TextView(this);
-        formHint.setText("Paste a full verification link, or enter the numbers manually.");
-        formHint.setTextColor(muted);
-        formHint.setTextSize(13);
-        formHint.setPadding(0, dp(4), 0, dp(14));
-        form.addView(formHint);
 
         form.addView(makeField(ptidInput, text -> text.matches("\\d{8}")));
         form.addView(makeField(codeInput, text -> text.matches("\\d{8}|\\d{10}")));
@@ -410,7 +404,7 @@ public class MainActivity extends Activity {
         EditText input = new EditText(this);
         input.setHint(hint);
         input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setTextSize(16);
         input.setTextColor(deepNavy);
         input.setHintTextColor(muted);
