@@ -385,11 +385,14 @@ public class MainActivity extends Activity {
 
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                clearButton.setVisibility(s.length() > 0 ? View.VISIBLE : View.INVISIBLE);
-                updateFieldBadge(stateBadge, s.toString(), validator);
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                input.post(() -> {
+                    String finalValue = input.getText().toString();
+                    clearButton.setVisibility(finalValue.length() > 0 ? View.VISIBLE : View.INVISIBLE);
+                    updateFieldBadge(stateBadge, finalValue, validator);
+                });
             }
-            @Override public void afterTextChanged(Editable s) {}
         });
         input.setOnFocusChangeListener((v, hasFocus) -> setInputRowBackground(inputRow, hasFocus, false));
 
