@@ -308,17 +308,21 @@ public class MainActivity extends Activity {
 
     private boolean isOnline() {
         ConnectivityManager manager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (manager == null) return false;
+        if (manager == null) return true;
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Network network = manager.getActiveNetwork();
-            if (network == null) return false;
-            NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
-            return capabilities != null && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Network network = manager.getActiveNetwork();
+                if (network == null) return false;
+                NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+                return capabilities != null && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            }
+
+            NetworkInfo info = manager.getActiveNetworkInfo();
+            return info != null && info.isConnected();
+        } catch (SecurityException ex) {
+            return true;
         }
-
-        NetworkInfo info = manager.getActiveNetworkInfo();
-        return info != null && info.isConnected();
     }
 
     @Override
