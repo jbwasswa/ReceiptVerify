@@ -450,9 +450,7 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (resultScreen != null && resultScreen.getVisibility() == View.VISIBLE && webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else if (resultScreen != null && resultScreen.getVisibility() == View.VISIBLE) {
+        if (resultScreen != null && resultScreen.getVisibility() == View.VISIBLE) {
             showInputScreen();
         } else {
             super.onBackPressed();
