@@ -56,6 +56,8 @@ public class MainActivity extends Activity {
     private ProgressBar progressBar;
     private ProgressBar resultProgressBar;
     private TextView resultStatusText;
+    private TextView ptidStateBadge;
+    private TextView codeStateBadge;
     private WebView webView;
 
     @Override
@@ -347,6 +349,11 @@ public class MainActivity extends Activity {
         stateBadge.setTextSize(12);
         stateBadge.setTypeface(Typeface.DEFAULT_BOLD);
         stateBadge.setVisibility(View.GONE);
+        if (input == ptidInput) {
+            ptidStateBadge = stateBadge;
+        } else if (input == codeInput) {
+            codeStateBadge = stateBadge;
+        }
 
         TextView clearButton = new TextView(this);
         clearButton.setText("X");
@@ -435,6 +442,8 @@ public class MainActivity extends Activity {
 
         String ptid = ptidInput.getText().toString().trim();
         String code = codeInput.getText().toString().trim();
+        updateFieldBadge(ptidStateBadge, ptid, text -> text.matches("\\d{8}"));
+        updateFieldBadge(codeStateBadge, code, text -> text.matches("\\d{8}|\\d{10}"));
         boolean validPtid = ptid.matches("\\d{8}");
         boolean validCode = code.matches("\\d{8}|\\d{10}");
         boolean isValid = validPtid && validCode;
@@ -537,6 +546,7 @@ public class MainActivity extends Activity {
     }
 
     private void updateFieldBadge(TextView badge, String value, FieldValidator validator) {
+        if (badge == null) return;
         if (value.isEmpty()) {
             badge.setVisibility(View.GONE);
             return;
