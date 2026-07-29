@@ -45,6 +45,8 @@ public class MainActivity extends Activity {
     private EditText ptidInput;
     private EditText codeInput;
     private Button verifyButton;
+    private LinearLayout inputScreen;
+    private LinearLayout resultScreen;
     private TextView statusText;
     private ProgressBar progressBar;
     private WebView webView;
@@ -59,7 +61,6 @@ public class MainActivity extends Activity {
 
     @SuppressLint("SetJavaScriptEnabled")
     private void configureWebView() {
-        webView.setVisibility(View.GONE);
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
@@ -96,11 +97,30 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Color.rgb(241, 247, 247));
         root.setLayoutParams(matchParent());
 
-        root.addView(buildHeader());
-        root.addView(buildForm());
+        inputScreen = new LinearLayout(this);
+        inputScreen.setOrientation(LinearLayout.VERTICAL);
+        inputScreen.setLayoutParams(matchParent());
+        inputScreen.addView(buildHeader());
+        inputScreen.addView(buildForm());
 
+        resultScreen = new LinearLayout(this);
+        resultScreen.setOrientation(LinearLayout.VERTICAL);
+        resultScreen.setLayoutParams(matchParent());
+        resultScreen.setVisibility(View.GONE);
+        resultScreen.addView(buildResultHeader());
         webView = new WebView(this);
-        root.addView(webView, new LinearLayout.LayoutParams(
+        resultScreen.addView(webView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1
+        ));
+
+        root.addView(inputScreen, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1
+        ));
+        root.addView(resultScreen, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 0,
                 1
@@ -137,6 +157,48 @@ public class MainActivity extends Activity {
         subtitle.setTextSize(14);
         subtitle.setPadding(0, dp(6), 0, 0);
         header.addView(subtitle);
+
+        return header;
+    }
+
+    private View buildResultHeader() {
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(12), dp(12), dp(12), dp(12));
+        header.setBackgroundColor(navy);
+
+        Button backButton = new Button(this);
+        backButton.setText("Back");
+        backButton.setAllCaps(false);
+        backButton.setTextColor(Color.WHITE);
+        backButton.setTextSize(15);
+        backButton.setBackgroundColor(Color.rgb(20, 70, 78));
+        backButton.setOnClickListener(v -> showInputScreen());
+        header.addView(backButton, new LinearLayout.LayoutParams(dp(94), dp(46)));
+
+        LinearLayout titleBlock = new LinearLayout(this);
+        titleBlock.setOrientation(LinearLayout.VERTICAL);
+        titleBlock.setPadding(dp(12), 0, 0, 0);
+
+        TextView title = new TextView(this);
+        title.setText("Verification Result");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(18);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        titleBlock.addView(title);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("Receipt verification page");
+        subtitle.setTextColor(Color.rgb(184, 219, 215));
+        subtitle.setTextSize(12);
+        titleBlock.addView(subtitle);
+
+        header.addView(titleBlock, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1
+        ));
 
         return header;
     }
@@ -299,10 +361,33 @@ public class MainActivity extends Activity {
             String url = VERIFY_BASE_URL
                     + "?ptid=" + URLEncoder.encode(ptid, "UTF-8")
                     + "&vc=" + URLEncoder.encode(code, "UTF-8");
-            webView.setVisibility(View.VISIBLE);
+            showResultScreen();
             webView.loadUrl(url);
         } catch (Exception ex) {
             Toast.makeText(this, "Could not build verification URL", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showResultScreen() {
+        hideKeyboard();
+        inputScreen.setVisibility(View.GONE);
+        resultScreen.setVisibility(View.VISIBLE);
+    }
+
+    private void showInputScreen() {
+        resultScreen.setVisibility(View.GONE);
+        inputScreen.setVisibility(View.VISIBLE);
+        progressBar.setVisibility(View.GONE);
+        statusText.setText("Ready to verify.");
+        statusText.setTextColor(teal);
+    }
+
+    private void hideKeyboard() {
+        View current = getCurrentFocus();
+        if (current == null) return;
+        InputMethodManager keyboard = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (keyboard != null) {
+            keyboard.hideSoftInputFromWindow(current.getWindowToken(), 0);
         }
     }
 
@@ -327,8 +412,10 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
+        if (resultScreen != null && resultScreen.getVisibility() == View.VISIBLE && webView != null && webView.canGoBack()) {
             webView.goBack();
+        } else if (resultScreen != null && resultScreen.getVisibility() == View.VISIBLE) {
+            showInputScreen();
         } else {
             super.onBackPressed();
         }
