@@ -430,6 +430,8 @@ public class MainActivity extends Activity {
         if (verifyButton == null || statusText == null) return;
         parsePastedVerificationText(ptidInput.getText().toString());
         parsePastedVerificationText(codeInput.getText().toString());
+        enforceNumericLimit(ptidInput, 8);
+        enforceNumericLimit(codeInput, 10);
 
         String ptid = ptidInput.getText().toString().trim();
         String code = codeInput.getText().toString().trim();
@@ -515,6 +517,22 @@ public class MainActivity extends Activity {
         ptidInput.setSelection(ptidInput.getText().length());
         codeInput.setText(codeMatcher.group(1));
         codeInput.setSelection(codeInput.getText().length());
+        applyingParsedInput = false;
+    }
+
+    private void enforceNumericLimit(EditText input, int maxDigits) {
+        if (applyingParsedInput) return;
+
+        String current = input.getText().toString();
+        String digits = current.replaceAll("\\D", "");
+        if (digits.length() > maxDigits) {
+            digits = digits.substring(0, maxDigits);
+        }
+        if (current.equals(digits)) return;
+
+        applyingParsedInput = true;
+        input.setText(digits);
+        input.setSelection(input.getText().length());
         applyingParsedInput = false;
     }
 
