@@ -259,8 +259,8 @@ public class MainActivity extends Activity {
         verifyButton.setAllCaps(false);
         verifyButton.setOnClickListener(v -> verifyReceipt());
 
-        form.addView(makeField("PTID", "Exactly 8 digits", ptidInput));
-        form.addView(makeField("Verification Code", "Exactly 8 or 10 digits", codeInput));
+        form.addView(makeField(ptidInput));
+        form.addView(makeField(codeInput));
         form.addView(verifyButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(50)
@@ -286,7 +286,7 @@ public class MainActivity extends Activity {
         return form;
     }
 
-    private View makeField(String label, String help, EditText input) {
+    private View makeField(EditText input) {
         LinearLayout wrapper = new LinearLayout(this);
         wrapper.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams wrapperParams = new LinearLayout.LayoutParams(
@@ -296,21 +296,42 @@ public class MainActivity extends Activity {
         wrapperParams.setMargins(0, 0, 0, dp(14));
         wrapper.setLayoutParams(wrapperParams);
 
-        TextView labelView = new TextView(this);
-        labelView.setText(label);
-        labelView.setTextColor(deepNavy);
-        labelView.setTextSize(14);
-        labelView.setTypeface(Typeface.DEFAULT_BOLD);
-        wrapper.addView(labelView);
+        LinearLayout inputRow = new LinearLayout(this);
+        inputRow.setOrientation(LinearLayout.HORIZONTAL);
+        inputRow.setGravity(Gravity.CENTER_VERTICAL);
+        inputRow.setBackgroundColor(Color.rgb(247, 250, 250));
 
-        TextView helpView = new TextView(this);
-        helpView.setText(help);
-        helpView.setTextColor(muted);
-        helpView.setTextSize(12);
-        helpView.setPadding(0, dp(2), 0, dp(6));
-        wrapper.addView(helpView);
+        TextView clearButton = new TextView(this);
+        clearButton.setText("X");
+        clearButton.setTextColor(muted);
+        clearButton.setTextSize(16);
+        clearButton.setTypeface(Typeface.DEFAULT_BOLD);
+        clearButton.setGravity(Gravity.CENTER);
+        clearButton.setVisibility(input.getText().length() > 0 ? View.VISIBLE : View.INVISIBLE);
+        clearButton.setContentDescription("Clear field");
+        clearButton.setOnClickListener(v -> {
+            input.setText("");
+            input.requestFocus();
+            InputMethodManager keyboard = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (keyboard != null) {
+                keyboard.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT);
+            }
+        });
 
-        wrapper.addView(input);
+        input.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                clearButton.setVisibility(s.length() > 0 ? View.VISIBLE : View.INVISIBLE);
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
+
+        inputRow.addView(input);
+        inputRow.addView(clearButton, new LinearLayout.LayoutParams(dp(44), ViewGroup.LayoutParams.MATCH_PARENT));
+        wrapper.addView(inputRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(52)
+        ));
         return wrapper;
     }
 
@@ -322,9 +343,9 @@ public class MainActivity extends Activity {
         input.setTextSize(16);
         input.setTextColor(deepNavy);
         input.setHintTextColor(muted);
-        input.setPadding(dp(12), 0, dp(12), 0);
+        input.setPadding(dp(12), 0, dp(6), 0);
         input.setFilters(new InputFilter[] { new InputFilter.LengthFilter(maxLength) });
-        input.setBackgroundColor(Color.rgb(247, 250, 250));
+        input.setBackgroundColor(Color.TRANSPARENT);
         input.setFocusable(true);
         input.setFocusableInTouchMode(true);
         input.setCursorVisible(true);
@@ -337,10 +358,10 @@ public class MainActivity extends Activity {
         });
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                0,
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(52)
+                1
         );
-        params.setMargins(0, 0, 0, dp(12));
         input.setLayoutParams(params);
         return input;
     }
