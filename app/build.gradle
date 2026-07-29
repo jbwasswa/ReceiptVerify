@@ -7,10 +7,10 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId "ug.co.targetfinance.receiptverify"
+        applicationId "ug.co.targetfinance.receiptverify.v2"
         minSdk 23
         targetSdk 35
-        versionCode 8
-        versionName "1.2.2"
+        versionCode 9
+        versionName "1.3.0-v2"
     }
 }

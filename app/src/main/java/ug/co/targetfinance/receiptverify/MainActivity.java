@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -12,7 +13,6 @@ import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
-import android.text.InputFilter;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.Gravity;
@@ -28,10 +28,13 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.net.URLEncoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends Activity {
     private static final String VERIFY_BASE_URL = "https://targetfinance.co.ug/verify.php";
@@ -41,6 +44,8 @@ public class MainActivity extends Activity {
     private final int teal = Color.rgb(0, 198, 155);
     private final int muted = Color.rgb(92, 111, 122);
     private final int danger = Color.rgb(200, 35, 51);
+    private final int border = Color.rgb(207, 222, 224);
+    private boolean applyingParsedInput = false;
 
     private EditText ptidInput;
     private EditText codeInput;
@@ -68,7 +73,7 @@ public class MainActivity extends Activity {
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 resultProgressBar.setVisibility(View.VISIBLE);
                 resultStatusText.setVisibility(View.VISIBLE);
-                resultStatusText.setText("Fetching latest verification result...");
+                resultStatusText.setText("Verifying receipt...");
                 resultStatusText.setTextColor(muted);
                 webView.setVisibility(View.GONE);
             }
@@ -176,9 +181,10 @@ public class MainActivity extends Activity {
         loading.setBackgroundColor(Color.WHITE);
 
         resultStatusText = new TextView(this);
-        resultStatusText.setText("Fetching latest verification result...");
+        resultStatusText.setText("Verifying receipt...");
         resultStatusText.setTextColor(muted);
         resultStatusText.setTextSize(13);
+        resultStatusText.setGravity(Gravity.CENTER);
         loading.addView(resultStatusText);
 
         resultProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -201,13 +207,14 @@ public class MainActivity extends Activity {
         header.setBackgroundColor(navy);
 
         Button backButton = new Button(this);
-        backButton.setText("Back");
+        backButton.setText("New Verification");
         backButton.setAllCaps(false);
         backButton.setTextColor(Color.WHITE);
-        backButton.setTextSize(15);
-        backButton.setBackgroundColor(Color.rgb(20, 70, 78));
+        backButton.setTextSize(14);
+        backButton.setTypeface(Typeface.DEFAULT_BOLD);
+        backButton.setBackground(makeRoundRect(Color.rgb(20, 70, 78), Color.rgb(20, 70, 78), dp(10)));
         backButton.setOnClickListener(v -> showInputScreen());
-        header.addView(backButton, new LinearLayout.LayoutParams(dp(94), dp(46)));
+        header.addView(backButton, new LinearLayout.LayoutParams(dp(142), dp(46)));
 
         LinearLayout titleBlock = new LinearLayout(this);
         titleBlock.setOrientation(LinearLayout.VERTICAL);
@@ -236,13 +243,28 @@ public class MainActivity extends Activity {
     }
 
     private View buildForm() {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.rgb(241, 247, 247));
+
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(16), dp(18), dp(16), dp(16));
+        scroll.addView(page, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
-        form.setPadding(dp(18), dp(18), dp(18), dp(16));
-        form.setBackgroundColor(Color.WHITE);
+        form.setPadding(dp(18), dp(18), dp(18), dp(18));
+        form.setBackground(makeRoundRect(Color.WHITE, Color.rgb(229, 238, 239), dp(16)));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            form.setElevation(dp(3));
+        }
 
-        ptidInput = makeInput("PTID (8 digits)", 8);
-        codeInput = makeInput("Verification code (8 or 10 digits)", 10);
+        ptidInput = makeInput("PTID (8 digits)");
+        codeInput = makeInput("Verification code (8 or 10 digits)");
 
         TextWatcher watcher = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -259,8 +281,22 @@ public class MainActivity extends Activity {
         verifyButton.setAllCaps(false);
         verifyButton.setOnClickListener(v -> verifyReceipt());
 
-        form.addView(makeField(ptidInput));
-        form.addView(makeField(codeInput));
+        TextView formTitle = new TextView(this);
+        formTitle.setText("Enter receipt details");
+        formTitle.setTextColor(deepNavy);
+        formTitle.setTextSize(18);
+        formTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        form.addView(formTitle);
+
+        TextView formHint = new TextView(this);
+        formHint.setText("Paste a full verification link, or enter the numbers manually.");
+        formHint.setTextColor(muted);
+        formHint.setTextSize(13);
+        formHint.setPadding(0, dp(4), 0, dp(14));
+        form.addView(formHint);
+
+        form.addView(makeField(ptidInput, text -> text.matches("\\d{8}")));
+        form.addView(makeField(codeInput, text -> text.matches("\\d{8}|\\d{10}")));
         form.addView(verifyButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(50)
@@ -283,10 +319,15 @@ public class MainActivity extends Activity {
         statusText.setPadding(0, dp(10), 0, 0);
         form.addView(statusText);
 
-        return form;
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        page.addView(form, cardParams);
+        return scroll;
     }
 
-    private View makeField(EditText input) {
+    private View makeField(EditText input, FieldValidator validator) {
         LinearLayout wrapper = new LinearLayout(this);
         wrapper.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams wrapperParams = new LinearLayout.LayoutParams(
@@ -299,7 +340,13 @@ public class MainActivity extends Activity {
         LinearLayout inputRow = new LinearLayout(this);
         inputRow.setOrientation(LinearLayout.HORIZONTAL);
         inputRow.setGravity(Gravity.CENTER_VERTICAL);
-        inputRow.setBackgroundColor(Color.rgb(247, 250, 250));
+        setInputRowBackground(inputRow, false, false);
+
+        TextView stateBadge = new TextView(this);
+        stateBadge.setGravity(Gravity.CENTER);
+        stateBadge.setTextSize(12);
+        stateBadge.setTypeface(Typeface.DEFAULT_BOLD);
+        stateBadge.setVisibility(View.GONE);
 
         TextView clearButton = new TextView(this);
         clearButton.setText("X");
@@ -307,6 +354,7 @@ public class MainActivity extends Activity {
         clearButton.setTextSize(16);
         clearButton.setTypeface(Typeface.DEFAULT_BOLD);
         clearButton.setGravity(Gravity.CENTER);
+        clearButton.setBackground(makeRoundRect(Color.TRANSPARENT, Color.TRANSPARENT, dp(16)));
         clearButton.setVisibility(input.getText().length() > 0 ? View.VISIBLE : View.INVISIBLE);
         clearButton.setContentDescription("Clear field");
         clearButton.setOnClickListener(v -> {
@@ -317,34 +365,46 @@ public class MainActivity extends Activity {
                 keyboard.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT);
             }
         });
+        clearButton.setOnTouchListener((v, event) -> {
+            if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                clearButton.setTextColor(teal);
+                clearButton.setBackground(makeRoundRect(Color.rgb(226, 248, 245), Color.TRANSPARENT, dp(16)));
+            } else if (event.getAction() == android.view.MotionEvent.ACTION_UP || event.getAction() == android.view.MotionEvent.ACTION_CANCEL) {
+                clearButton.setTextColor(muted);
+                clearButton.setBackground(makeRoundRect(Color.TRANSPARENT, Color.TRANSPARENT, dp(16)));
+            }
+            return false;
+        });
 
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 clearButton.setVisibility(s.length() > 0 ? View.VISIBLE : View.INVISIBLE);
+                updateFieldBadge(stateBadge, s.toString(), validator);
             }
             @Override public void afterTextChanged(Editable s) {}
         });
+        input.setOnFocusChangeListener((v, hasFocus) -> setInputRowBackground(inputRow, hasFocus, false));
 
         inputRow.addView(input);
+        inputRow.addView(stateBadge, new LinearLayout.LayoutParams(dp(40), ViewGroup.LayoutParams.MATCH_PARENT));
         inputRow.addView(clearButton, new LinearLayout.LayoutParams(dp(44), ViewGroup.LayoutParams.MATCH_PARENT));
         wrapper.addView(inputRow, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(52)
+                dp(54)
         ));
         return wrapper;
     }
 
-    private EditText makeInput(String hint, int maxLength) {
+    private EditText makeInput(String hint) {
         EditText input = new EditText(this);
         input.setHint(hint);
         input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
         input.setTextSize(16);
         input.setTextColor(deepNavy);
         input.setHintTextColor(muted);
         input.setPadding(dp(12), 0, dp(6), 0);
-        input.setFilters(new InputFilter[] { new InputFilter.LengthFilter(maxLength) });
         input.setBackgroundColor(Color.TRANSPARENT);
         input.setFocusable(true);
         input.setFocusableInTouchMode(true);
@@ -368,6 +428,8 @@ public class MainActivity extends Activity {
 
     private void updateValidationState() {
         if (verifyButton == null || statusText == null) return;
+        parsePastedVerificationText(ptidInput.getText().toString());
+        parsePastedVerificationText(codeInput.getText().toString());
 
         String ptid = ptidInput.getText().toString().trim();
         String code = codeInput.getText().toString().trim();
@@ -376,8 +438,7 @@ public class MainActivity extends Activity {
         boolean isValid = validPtid && validCode;
 
         verifyButton.setEnabled(isValid);
-        verifyButton.setTextColor(isValid ? Color.WHITE : Color.rgb(126, 141, 150));
-        verifyButton.setBackgroundColor(isValid ? teal : Color.rgb(226, 233, 236));
+        setVerifyButtonState(isValid);
 
         if (ptid.isEmpty() && code.isEmpty()) {
             statusText.setText("Enter PTID and verification code.");
@@ -426,7 +487,7 @@ public class MainActivity extends Activity {
         webView.setVisibility(View.GONE);
         resultProgressBar.setVisibility(View.VISIBLE);
         resultStatusText.setVisibility(View.VISIBLE);
-        resultStatusText.setText("Fetching latest verification result...");
+        resultStatusText.setText("Verifying receipt...");
         resultStatusText.setTextColor(muted);
         inputScreen.setVisibility(View.GONE);
         resultScreen.setVisibility(View.VISIBLE);
@@ -439,6 +500,58 @@ public class MainActivity extends Activity {
         resultProgressBar.setVisibility(View.GONE);
         statusText.setText("Ready to verify.");
         statusText.setTextColor(teal);
+    }
+
+    private void parsePastedVerificationText(String text) {
+        if (applyingParsedInput || text == null) return;
+        if (!text.contains("ptid=") && !text.contains("vc=")) return;
+
+        Matcher ptidMatcher = Pattern.compile("(?:ptid=)(\\d{8})", Pattern.CASE_INSENSITIVE).matcher(text);
+        Matcher codeMatcher = Pattern.compile("(?:vc=)(\\d{8}|\\d{10})", Pattern.CASE_INSENSITIVE).matcher(text);
+        if (!ptidMatcher.find() || !codeMatcher.find()) return;
+
+        applyingParsedInput = true;
+        ptidInput.setText(ptidMatcher.group(1));
+        ptidInput.setSelection(ptidInput.getText().length());
+        codeInput.setText(codeMatcher.group(1));
+        codeInput.setSelection(codeInput.getText().length());
+        applyingParsedInput = false;
+    }
+
+    private void updateFieldBadge(TextView badge, String value, FieldValidator validator) {
+        if (value.isEmpty()) {
+            badge.setVisibility(View.GONE);
+            return;
+        }
+        boolean valid = validator.isValid(value.trim());
+        badge.setVisibility(View.VISIBLE);
+        badge.setText(valid ? "OK" : "!");
+        badge.setTextColor(valid ? teal : danger);
+    }
+
+    private void setVerifyButtonState(boolean enabled) {
+        verifyButton.setTextColor(enabled ? Color.WHITE : Color.rgb(126, 141, 150));
+        verifyButton.setBackground(makeRoundRect(
+                enabled ? teal : Color.rgb(226, 233, 236),
+                enabled ? teal : Color.rgb(211, 222, 226),
+                dp(12)
+        ));
+    }
+
+    private void setInputRowBackground(View view, boolean focused, boolean invalid) {
+        int stroke = invalid ? danger : (focused ? teal : border);
+        view.setBackground(makeRoundRect(Color.rgb(247, 250, 250), stroke, dp(12)));
+    }
+
+    private GradientDrawable makeRoundRect(int fill, int stroke, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.RECTANGLE);
+        drawable.setColor(fill);
+        drawable.setCornerRadius(radius);
+        if (stroke != Color.TRANSPARENT) {
+            drawable.setStroke(dp(1), stroke);
+        }
+        return drawable;
     }
 
     private void hideKeyboard() {
@@ -488,5 +601,9 @@ public class MainActivity extends Activity {
     private int dp(int value) {
         float density = getResources().getDisplayMetrics().density;
         return Math.round(value * density);
+    }
+
+    private interface FieldValidator {
+        boolean isValid(String value);
     }
 }
