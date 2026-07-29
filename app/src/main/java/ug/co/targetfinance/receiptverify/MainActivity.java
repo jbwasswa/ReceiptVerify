@@ -49,6 +49,8 @@ public class MainActivity extends Activity {
     private LinearLayout resultScreen;
     private TextView statusText;
     private ProgressBar progressBar;
+    private ProgressBar resultProgressBar;
+    private TextView resultStatusText;
     private WebView webView;
 
     @Override
@@ -64,23 +66,28 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                progressBar.setVisibility(View.VISIBLE);
-                statusText.setText("Verifying receipt...");
-                statusText.setTextColor(muted);
+                resultProgressBar.setVisibility(View.VISIBLE);
+                resultStatusText.setVisibility(View.VISIBLE);
+                resultStatusText.setText("Fetching latest verification result...");
+                resultStatusText.setTextColor(muted);
+                webView.setVisibility(View.GONE);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                progressBar.setVisibility(View.GONE);
-                statusText.setText("Verification result loaded.");
-                statusText.setTextColor(teal);
+                resultProgressBar.setVisibility(View.GONE);
+                resultStatusText.setText("Verification result loaded.");
+                resultStatusText.setTextColor(teal);
+                webView.setVisibility(View.VISIBLE);
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                progressBar.setVisibility(View.GONE);
-                statusText.setText("Could not load the verification result. Check internet and try again.");
-                statusText.setTextColor(danger);
+                resultProgressBar.setVisibility(View.GONE);
+                resultStatusText.setVisibility(View.VISIBLE);
+                resultStatusText.setText("Could not load the verification result. Check internet and try again.");
+                resultStatusText.setTextColor(danger);
+                webView.setVisibility(View.GONE);
             }
         });
 
@@ -108,6 +115,7 @@ public class MainActivity extends Activity {
         resultScreen.setLayoutParams(matchParent());
         resultScreen.setVisibility(View.GONE);
         resultScreen.addView(buildResultHeader());
+        resultScreen.addView(buildResultLoadingBar());
         webView = new WebView(this);
         resultScreen.addView(webView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -159,6 +167,30 @@ public class MainActivity extends Activity {
         header.addView(subtitle);
 
         return header;
+    }
+
+    private View buildResultLoadingBar() {
+        LinearLayout loading = new LinearLayout(this);
+        loading.setOrientation(LinearLayout.VERTICAL);
+        loading.setPadding(dp(14), dp(10), dp(14), dp(10));
+        loading.setBackgroundColor(Color.WHITE);
+
+        resultStatusText = new TextView(this);
+        resultStatusText.setText("Fetching latest verification result...");
+        resultStatusText.setTextColor(muted);
+        resultStatusText.setTextSize(13);
+        loading.addView(resultStatusText);
+
+        resultProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        resultProgressBar.setIndeterminate(true);
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(3)
+        );
+        progressParams.setMargins(0, dp(8), 0, 0);
+        loading.addView(resultProgressBar, progressParams);
+
+        return loading;
     }
 
     private View buildResultHeader() {
@@ -370,6 +402,11 @@ public class MainActivity extends Activity {
 
     private void showResultScreen() {
         hideKeyboard();
+        webView.setVisibility(View.GONE);
+        resultProgressBar.setVisibility(View.VISIBLE);
+        resultStatusText.setVisibility(View.VISIBLE);
+        resultStatusText.setText("Fetching latest verification result...");
+        resultStatusText.setTextColor(muted);
         inputScreen.setVisibility(View.GONE);
         resultScreen.setVisibility(View.VISIBLE);
     }
@@ -378,6 +415,7 @@ public class MainActivity extends Activity {
         resultScreen.setVisibility(View.GONE);
         inputScreen.setVisibility(View.VISIBLE);
         progressBar.setVisibility(View.GONE);
+        resultProgressBar.setVisibility(View.GONE);
         statusText.setText("Ready to verify.");
         statusText.setTextColor(teal);
     }
