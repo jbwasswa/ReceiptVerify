@@ -40,6 +40,7 @@ import android.widget.Toast;
 
 import java.net.URLEncoder;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -674,14 +675,81 @@ public class MainActivity extends Activity {
         qrScanActive = true;
         try {
             camera = Camera.open();
+            configureCamera(camera);
             camera.setDisplayOrientation(90);
             camera.setPreviewDisplay(holder);
             camera.setPreviewCallback((data, activeCamera) -> decodePreviewFrame(data, activeCamera));
             camera.startPreview();
+            requestQrFocus();
         } catch (Exception ex) {
             stopCameraPreview();
             scannerStatusText.setText("Could not start camera.");
             showQrMessage("Could not start camera. Check permission and try again.", danger);
+        }
+    }
+
+    private void configureCamera(Camera activeCamera) {
+        Camera.Parameters parameters = activeCamera.getParameters();
+        Camera.Size previewSize = choosePreviewSize(parameters.getSupportedPreviewSizes());
+        if (previewSize != null) {
+            parameters.setPreviewSize(previewSize.width, previewSize.height);
+        }
+
+        List<String> focusModes = parameters.getSupportedFocusModes();
+        if (focusModes != null) {
+            if (focusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE)) {
+                parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+            } else if (focusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
+                parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
+            } else if (focusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO)) {
+                parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+            } else if (focusModes.contains(Camera.Parameters.FOCUS_MODE_MACRO)) {
+                parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
+            }
+        }
+
+        List<String> sceneModes = parameters.getSupportedSceneModes();
+        if (sceneModes != null && sceneModes.contains(Camera.Parameters.SCENE_MODE_BARCODE)) {
+            parameters.setSceneMode(Camera.Parameters.SCENE_MODE_BARCODE);
+        }
+
+        List<String> whiteBalanceModes = parameters.getSupportedWhiteBalance();
+        if (whiteBalanceModes != null && whiteBalanceModes.contains(Camera.Parameters.WHITE_BALANCE_AUTO)) {
+            parameters.setWhiteBalance(Camera.Parameters.WHITE_BALANCE_AUTO);
+        }
+
+        activeCamera.setParameters(parameters);
+    }
+
+    private Camera.Size choosePreviewSize(List<Camera.Size> supportedSizes) {
+        if (supportedSizes == null || supportedSizes.isEmpty()) return null;
+
+        Camera.Size best = null;
+        for (Camera.Size size : supportedSizes) {
+            int longSide = Math.max(size.width, size.height);
+            int shortSide = Math.min(size.width, size.height);
+            if (longSide > 1920 || shortSide > 1080) continue;
+            if (best == null || size.width * size.height > best.width * best.height) {
+                best = size;
+            }
+        }
+        return best != null ? best : supportedSizes.get(0);
+    }
+
+    private void requestQrFocus() {
+        if (!qrScanActive || camera == null) return;
+
+        try {
+            String focusMode = camera.getParameters().getFocusMode();
+            if (Camera.Parameters.FOCUS_MODE_AUTO.equals(focusMode)
+                    || Camera.Parameters.FOCUS_MODE_MACRO.equals(focusMode)) {
+                camera.autoFocus((success, activeCamera) -> {
+                    if (qrScanActive && qrPreview != null) {
+                        qrPreview.postDelayed(this::requestQrFocus, 1200);
+                    }
+                });
+            }
+        } catch (Exception ignored) {
         }
     }
 
