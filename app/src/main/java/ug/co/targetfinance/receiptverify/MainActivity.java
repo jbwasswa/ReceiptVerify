@@ -1,12 +1,14 @@
 package ug.co.targetfinance.receiptverify;
 
 import android.annotation.SuppressLint;
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.hardware.Camera;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -18,6 +20,8 @@ import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
@@ -35,14 +39,23 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.net.URLEncoder;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.google.zxing.integration.android.IntentIntegrator;
-import com.google.zxing.integration.android.IntentResult;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.DecodeHintType;
+import com.google.zxing.MultiFormatReader;
+import com.google.zxing.NotFoundException;
+import com.google.zxing.PlanarYUVLuminanceSource;
+import com.google.zxing.Result;
+import com.google.zxing.common.HybridBinarizer;
 
 public class MainActivity extends Activity {
     private static final String VERIFY_BASE_URL = "https://targetfinance.co.ug/verify.php";
+    private static final int CAMERA_PERMISSION_REQUEST = 24;
 
     private final int navy = Color.rgb(13, 43, 50);
     private final int deepNavy = Color.rgb(7, 25, 29);
@@ -58,13 +71,19 @@ public class MainActivity extends Activity {
     private Button verifyButton;
     private LinearLayout inputScreen;
     private LinearLayout resultScreen;
+    private LinearLayout scannerScreen;
     private TextView statusText;
+    private TextView scannerStatusText;
     private ProgressBar progressBar;
     private ProgressBar resultProgressBar;
     private TextView resultStatusText;
     private TextView ptidStateBadge;
     private TextView codeStateBadge;
+    private SurfaceView qrPreview;
     private WebView webView;
+    private Camera camera;
+    private MultiFormatReader qrReader;
+    private boolean qrScanActive = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -136,12 +155,49 @@ public class MainActivity extends Activity {
                 1
         ));
 
+        scannerScreen = new LinearLayout(this);
+        scannerScreen.setOrientation(LinearLayout.VERTICAL);
+        scannerScreen.setLayoutParams(matchParent());
+        scannerScreen.setVisibility(View.GONE);
+        scannerScreen.addView(buildScannerHeader());
+        qrPreview = new SurfaceView(this);
+        qrPreview.getHolder().addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(SurfaceHolder holder) {
+                if (qrScanActive) {
+                    startCameraPreview(holder);
+                }
+            }
+
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+                if (qrScanActive) {
+                    startCameraPreview(holder);
+                }
+            }
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {
+                stopCameraPreview();
+            }
+        });
+        scannerScreen.addView(qrPreview, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1
+        ));
+
         root.addView(inputScreen, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 0,
                 1
         ));
         root.addView(resultScreen, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1
+        ));
+        root.addView(scannerScreen, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 0,
                 1
@@ -205,6 +261,41 @@ public class MainActivity extends Activity {
         loading.addView(resultProgressBar, progressParams);
 
         return loading;
+    }
+
+    private View buildScannerHeader() {
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(12), dp(12), dp(12), dp(12));
+        header.setBackgroundColor(navy);
+
+        Button cancelButton = new Button(this);
+        cancelButton.setText("Cancel");
+        cancelButton.setAllCaps(false);
+        cancelButton.setTextColor(Color.WHITE);
+        cancelButton.setTextSize(14);
+        cancelButton.setTypeface(Typeface.DEFAULT_BOLD);
+        cancelButton.setBackground(makeRoundRect(Color.rgb(20, 70, 78), Color.rgb(20, 70, 78), dp(10)));
+        cancelButton.setOnClickListener(v -> {
+            stopCameraPreview();
+            showInputScreen();
+        });
+        header.addView(cancelButton, new LinearLayout.LayoutParams(dp(104), dp(46)));
+
+        scannerStatusText = new TextView(this);
+        scannerStatusText.setText("Point camera at receipt QR code");
+        scannerStatusText.setTextColor(Color.WHITE);
+        scannerStatusText.setTextSize(15);
+        scannerStatusText.setTypeface(Typeface.DEFAULT_BOLD);
+        scannerStatusText.setPadding(dp(12), 0, 0, 0);
+        header.addView(scannerStatusText, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1
+        ));
+
+        return header;
     }
 
     private View buildResultHeader() {
@@ -514,17 +605,21 @@ public class MainActivity extends Activity {
 
     private void showResultScreen() {
         hideKeyboard();
+        stopCameraPreview();
         webView.setVisibility(View.GONE);
         resultProgressBar.setVisibility(View.VISIBLE);
         resultStatusText.setVisibility(View.VISIBLE);
         resultStatusText.setText("Verifying receipt...");
         resultStatusText.setTextColor(muted);
         inputScreen.setVisibility(View.GONE);
+        scannerScreen.setVisibility(View.GONE);
         resultScreen.setVisibility(View.VISIBLE);
     }
 
     private void showInputScreen() {
+        stopCameraPreview();
         resultScreen.setVisibility(View.GONE);
+        scannerScreen.setVisibility(View.GONE);
         inputScreen.setVisibility(View.VISIBLE);
         progressBar.setVisibility(View.GONE);
         resultProgressBar.setVisibility(View.GONE);
@@ -533,22 +628,141 @@ public class MainActivity extends Activity {
     }
 
     private void startQrScan() {
-        IntentIntegrator integrator = new IntentIntegrator(this);
-        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
-        integrator.setPrompt("Scan Target Finance receipt QR code");
-        integrator.setBeepEnabled(true);
-        integrator.setOrientationLocked(false);
-        integrator.initiateScan();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+            return;
+        }
+        showScannerScreen();
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
-        if (result != null) {
-            handleQrScanResult(result.getContents());
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                showScannerScreen();
+            } else {
+                showQrMessage("Camera permission is needed to scan QR codes.", danger);
+            }
+        }
+    }
+
+    private void showScannerScreen() {
+        hideKeyboard();
+        inputScreen.setVisibility(View.GONE);
+        resultScreen.setVisibility(View.GONE);
+        scannerScreen.setVisibility(View.VISIBLE);
+        scannerStatusText.setText("Point camera at receipt QR code");
+        qrScanActive = true;
+        configureQrReader();
+        SurfaceHolder holder = qrPreview.getHolder();
+        if (holder.getSurface() != null && holder.getSurface().isValid()) {
+            startCameraPreview(holder);
+        }
+    }
+
+    private void configureQrReader() {
+        qrReader = new MultiFormatReader();
+        Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
+        hints.put(DecodeHintType.POSSIBLE_FORMATS, java.util.Collections.singletonList(BarcodeFormat.QR_CODE));
+        qrReader.setHints(hints);
+    }
+
+    private void startCameraPreview(SurfaceHolder holder) {
+        stopCameraPreview();
+        qrScanActive = true;
+        try {
+            camera = Camera.open();
+            camera.setDisplayOrientation(90);
+            camera.setPreviewDisplay(holder);
+            camera.setPreviewCallback((data, activeCamera) -> decodePreviewFrame(data, activeCamera));
+            camera.startPreview();
+        } catch (Exception ex) {
+            stopCameraPreview();
+            scannerStatusText.setText("Could not start camera.");
+            showQrMessage("Could not start camera. Check permission and try again.", danger);
+        }
+    }
+
+    private void stopCameraPreview() {
+        qrScanActive = false;
+        if (camera == null) return;
+        try {
+            camera.setPreviewCallback(null);
+            camera.stopPreview();
+            camera.release();
+        } catch (Exception ignored) {
+        }
+        camera = null;
+    }
+
+    private void decodePreviewFrame(byte[] data, Camera activeCamera) {
+        if (!qrScanActive || qrReader == null || activeCamera == null) return;
+
+        Camera.Size size = activeCamera.getParameters().getPreviewSize();
+        int width = size.width;
+        int height = size.height;
+        byte[] rotatedData = rotatePreviewData(data, width, height);
+        int rotatedWidth = height;
+        int rotatedHeight = width;
+
+        PlanarYUVLuminanceSource source = new PlanarYUVLuminanceSource(
+                rotatedData,
+                rotatedWidth,
+                rotatedHeight,
+                0,
+                0,
+                rotatedWidth,
+                rotatedHeight,
+                false
+        );
+        BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+
+        try {
+            Result result = qrReader.decodeWithState(bitmap);
+            qrScanActive = false;
+            runOnUiThread(() -> {
+                stopCameraPreview();
+                showInputScreen();
+                handleQrScanResult(result.getText());
+            });
+        } catch (NotFoundException ex) {
+            qrReader.reset();
+        }
+    }
+
+    private byte[] rotatePreviewData(byte[] data, int width, int height) {
+        byte[] rotated = new byte[width * height];
+        int index = 0;
+        for (int x = 0; x < width; x++) {
+            for (int y = height - 1; y >= 0; y--) {
+                rotated[index++] = data[y * width + x];
+            }
+        }
+        return rotated;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (scannerScreen != null && scannerScreen.getVisibility() == View.VISIBLE) {
+            stopCameraPreview();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (scannerScreen != null && scannerScreen.getVisibility() == View.VISIBLE && !qrScanActive) {
+            qrScanActive = true;
+            configureQrReader();
+            SurfaceHolder holder = qrPreview.getHolder();
+            if (holder.getSurface() != null && holder.getSurface().isValid()) {
+                startCameraPreview(holder);
+            }
             return;
         }
-        super.onActivityResult(requestCode, resultCode, data);
     }
 
     private void handleQrScanResult(String qrText) {
@@ -704,7 +918,10 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (resultScreen != null && resultScreen.getVisibility() == View.VISIBLE) {
+        if (scannerScreen != null && scannerScreen.getVisibility() == View.VISIBLE) {
+            stopCameraPreview();
+            showInputScreen();
+        } else if (resultScreen != null && resultScreen.getVisibility() == View.VISIBLE) {
             showInputScreen();
         } else {
             super.onBackPressed();
