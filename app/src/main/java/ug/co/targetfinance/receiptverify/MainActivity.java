@@ -9,6 +9,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.Camera;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -84,11 +86,13 @@ public class MainActivity extends Activity {
     private WebView webView;
     private Camera camera;
     private MultiFormatReader qrReader;
+    private ToneGenerator toneGenerator;
     private boolean qrScanActive = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
         buildUi();
         configureWebView();
         updateValidationState();
@@ -853,7 +857,13 @@ public class MainActivity extends Activity {
         applyingParsedInput = false;
 
         updateValidationState();
+        playScanSuccessBeep();
         showQrMessage("QR code scanned. Review details, then verify.", teal);
+    }
+
+    private void playScanSuccessBeep() {
+        if (toneGenerator == null) return;
+        toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 160);
     }
 
     private ParsedReceipt parseReceiptUrl(String qrText) {
@@ -994,6 +1004,15 @@ public class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (toneGenerator != null) {
+            toneGenerator.release();
+            toneGenerator = null;
+        }
+        super.onDestroy();
     }
 
     private LinearLayout.LayoutParams matchParent() {
