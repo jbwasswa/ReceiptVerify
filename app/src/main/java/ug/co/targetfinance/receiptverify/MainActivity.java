@@ -3,6 +3,7 @@ package ug.co.targetfinance.receiptverify;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -10,6 +11,7 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
@@ -36,6 +38,9 @@ import java.net.URLEncoder;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
+
 public class MainActivity extends Activity {
     private static final String VERIFY_BASE_URL = "https://targetfinance.co.ug/verify.php";
 
@@ -49,6 +54,7 @@ public class MainActivity extends Activity {
 
     private EditText ptidInput;
     private EditText codeInput;
+    private Button scanButton;
     private Button verifyButton;
     private LinearLayout inputScreen;
     private LinearLayout resultScreen;
@@ -283,6 +289,15 @@ public class MainActivity extends Activity {
         verifyButton.setAllCaps(false);
         verifyButton.setOnClickListener(v -> verifyReceipt());
 
+        scanButton = new Button(this);
+        scanButton.setText("Scan QR Code");
+        scanButton.setTextSize(15);
+        scanButton.setTypeface(Typeface.DEFAULT_BOLD);
+        scanButton.setAllCaps(false);
+        scanButton.setTextColor(teal);
+        scanButton.setBackground(makeRoundRect(Color.rgb(236, 251, 248), teal, dp(12)));
+        scanButton.setOnClickListener(v -> startQrScan());
+
         TextView formTitle = new TextView(this);
         formTitle.setText("Enter receipt details");
         formTitle.setTextColor(deepNavy);
@@ -290,6 +305,13 @@ public class MainActivity extends Activity {
         formTitle.setTypeface(Typeface.DEFAULT_BOLD);
         formTitle.setPadding(0, 0, 0, dp(14));
         form.addView(formTitle);
+
+        LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)
+        );
+        scanParams.setMargins(0, 0, 0, dp(14));
+        form.addView(scanButton, scanParams);
 
         form.addView(makeField(ptidInput, text -> text.matches("\\d{8}")));
         form.addView(makeField(codeInput, text -> text.matches("\\d{8}|\\d{10}")));
@@ -510,6 +532,79 @@ public class MainActivity extends Activity {
         statusText.setTextColor(teal);
     }
 
+    private void startQrScan() {
+        IntentIntegrator integrator = new IntentIntegrator(this);
+        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
+        integrator.setPrompt("Scan Target Finance receipt QR code");
+        integrator.setBeepEnabled(true);
+        integrator.setOrientationLocked(false);
+        integrator.initiateScan();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (result != null) {
+            handleQrScanResult(result.getContents());
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    private void handleQrScanResult(String qrText) {
+        if (qrText == null || qrText.trim().isEmpty()) {
+            showQrMessage("Scan cancelled.", muted);
+            return;
+        }
+
+        ParsedReceipt parsedReceipt = parseReceiptUrl(qrText.trim());
+        if (!parsedReceipt.isValid) {
+            showQrMessage(parsedReceipt.message, danger);
+            return;
+        }
+
+        applyingParsedInput = true;
+        ptidInput.setText(parsedReceipt.ptid);
+        ptidInput.setSelection(ptidInput.getText().length());
+        codeInput.setText(parsedReceipt.code);
+        codeInput.setSelection(codeInput.getText().length());
+        applyingParsedInput = false;
+
+        updateValidationState();
+        showQrMessage("QR code scanned. Review details, then verify.", teal);
+    }
+
+    private ParsedReceipt parseReceiptUrl(String qrText) {
+        Uri uri = Uri.parse(qrText);
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        String path = uri.getPath();
+
+        boolean validEndpoint = "https".equalsIgnoreCase(scheme)
+                && "targetfinance.co.ug".equalsIgnoreCase(host)
+                && "/verify.php".equals(path);
+        if (!validEndpoint) {
+            return ParsedReceipt.error("This QR code is not a valid Target Finance receipt.");
+        }
+
+        String ptid = uri.getQueryParameter("ptid");
+        String code = uri.getQueryParameter("vc");
+        if (ptid == null || code == null || ptid.isEmpty() || code.isEmpty()) {
+            return ParsedReceipt.error("QR code found, but PTID or verification code is missing.");
+        }
+        if (!ptid.matches("\\d{8}") || !code.matches("\\d{8}|\\d{10}")) {
+            return ParsedReceipt.error("QR code found, but receipt numbers are not in the expected format.");
+        }
+
+        return ParsedReceipt.success(ptid, code);
+    }
+
+    private void showQrMessage(String message, int color) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        statusText.setText(message);
+        statusText.setTextColor(color);
+    }
+
     private void parsePastedVerificationText(String text) {
         if (applyingParsedInput || text == null) return;
         if (!text.contains("ptid=") && !text.contains("vc=")) return;
@@ -630,5 +725,27 @@ public class MainActivity extends Activity {
 
     private interface FieldValidator {
         boolean isValid(String value);
+    }
+
+    private static class ParsedReceipt {
+        final boolean isValid;
+        final String ptid;
+        final String code;
+        final String message;
+
+        private ParsedReceipt(boolean isValid, String ptid, String code, String message) {
+            this.isValid = isValid;
+            this.ptid = ptid;
+            this.code = code;
+            this.message = message;
+        }
+
+        static ParsedReceipt success(String ptid, String code) {
+            return new ParsedReceipt(true, ptid, code, "");
+        }
+
+        static ParsedReceipt error(String message) {
+            return new ParsedReceipt(false, "", "", message);
+        }
     }
 }

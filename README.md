@@ -7,6 +7,10 @@ The app accepts:
 - PTID
 - Verification Code
 
+If a receipt has a QR code, the app can scan it, validate that it points to the
+Target Finance verification URL, and fill the PTID and verification code
+automatically.
+
 Then loads:
 
 ```text
