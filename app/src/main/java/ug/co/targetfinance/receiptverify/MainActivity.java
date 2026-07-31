@@ -214,25 +214,31 @@ public class MainActivity extends Activity {
 
     private View buildHeader() {
         LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.VERTICAL);
-        header.setPadding(dp(22), dp(18), dp(22), dp(18));
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(20), dp(18), dp(20), dp(18));
         header.setBackgroundColor(navy);
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.target_finance_logo);
         logo.setAdjustViewBounds(true);
-        logo.setScaleType(ImageView.ScaleType.FIT_START);
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(172), dp(58));
-        logoParams.setMargins(0, 0, 0, dp(8));
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(108), dp(54));
+        logoParams.setMargins(0, 0, dp(16), 0);
         header.addView(logo, logoParams);
 
         TextView title = new TextView(this);
-        title.setText("Receipt Verification");
+        title.setText("Receipt\nVerification");
         title.setTextColor(Color.WHITE);
         title.setTextSize(24);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setPadding(0, 0, 0, 0);
-        header.addView(title);
+        title.setLineSpacing(0, 0.96f);
+        title.setIncludeFontPadding(false);
+        header.addView(title, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1
+        ));
 
         return header;
     }
