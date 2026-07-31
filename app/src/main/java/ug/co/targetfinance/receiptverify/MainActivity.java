@@ -34,6 +34,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -214,31 +215,24 @@ public class MainActivity extends Activity {
     private View buildHeader() {
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.VERTICAL);
-        header.setPadding(dp(22), dp(22), dp(22), dp(18));
+        header.setPadding(dp(22), dp(18), dp(22), dp(18));
         header.setBackgroundColor(navy);
 
-        TextView brand = new TextView(this);
-        brand.setText("TARGET FINANCE");
-        brand.setTextColor(teal);
-        brand.setTextSize(13);
-        brand.setTypeface(Typeface.DEFAULT_BOLD);
-        brand.setLetterSpacing(0.08f);
-        header.addView(brand);
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.target_finance_logo);
+        logo.setAdjustViewBounds(true);
+        logo.setScaleType(ImageView.ScaleType.FIT_START);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(172), dp(58));
+        logoParams.setMargins(0, 0, 0, dp(8));
+        header.addView(logo, logoParams);
 
         TextView title = new TextView(this);
         title.setText("Receipt Verification");
         title.setTextColor(Color.WHITE);
         title.setTextSize(24);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setPadding(0, dp(4), 0, 0);
+        title.setPadding(0, 0, 0, 0);
         header.addView(title);
-
-        TextView subtitle = new TextView(this);
-        subtitle.setText("Confirm payments using the PTID and verification code on the receipt.");
-        subtitle.setTextColor(Color.rgb(184, 219, 215));
-        subtitle.setTextSize(14);
-        subtitle.setPadding(0, dp(6), 0, 0);
-        header.addView(subtitle);
 
         return header;
     }
