@@ -221,16 +221,16 @@ public class MainActivity extends Activity {
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.target_finance_logo);
-        logo.setAdjustViewBounds(false);
-        logo.setScaleType(ImageView.ScaleType.CENTER);
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(100, 49);
-        logoParams.setMargins(0, 0, dp(18), 0);
+        logo.setAdjustViewBounds(true);
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(122), dp(60));
+        logoParams.setMargins(0, 0, dp(14), 0);
         header.addView(logo, logoParams);
 
         TextView title = new TextView(this);
         title.setText("Receipt\nVerification");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(22);
+        title.setTextSize(21);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setLineSpacing(0, 0.96f);
         title.setIncludeFontPadding(false);
