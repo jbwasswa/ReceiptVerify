@@ -219,42 +219,13 @@ public class MainActivity extends Activity {
         header.setPadding(dp(18), dp(18), dp(18), dp(18));
         header.setBackgroundColor(navy);
 
-        LinearLayout brandLockup = new LinearLayout(this);
-        brandLockup.setOrientation(LinearLayout.HORIZONTAL);
-        brandLockup.setGravity(Gravity.CENTER_VERTICAL);
-
         ImageView logo = new ImageView(this);
-        logo.setImageResource(R.mipmap.ic_launcher);
-        logo.setAdjustViewBounds(true);
-        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(42), dp(42));
-        logoParams.setMargins(0, 0, dp(8), 0);
-        brandLockup.addView(logo, logoParams);
-
-        LinearLayout brandText = new LinearLayout(this);
-        brandText.setOrientation(LinearLayout.VERTICAL);
-        brandText.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView brandName = new TextView(this);
-        brandName.setText("TARGET");
-        brandName.setTextColor(teal);
-        brandName.setTextSize(16);
-        brandName.setTypeface(Typeface.DEFAULT_BOLD);
-        brandName.setIncludeFontPadding(false);
-        brandText.addView(brandName);
-
-        TextView brandDetail = new TextView(this);
-        brandDetail.setText("FINANCE LIMITED");
-        brandDetail.setTextColor(Color.rgb(184, 219, 215));
-        brandDetail.setTextSize(9);
-        brandDetail.setTypeface(Typeface.DEFAULT_BOLD);
-        brandDetail.setIncludeFontPadding(false);
-        brandText.addView(brandDetail);
-
-        brandLockup.addView(brandText);
-        LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(dp(146), ViewGroup.LayoutParams.WRAP_CONTENT);
-        brandParams.setMargins(0, 0, dp(10), 0);
-        header.addView(brandLockup, brandParams);
+        logo.setImageResource(R.drawable.target_finance_logo);
+        logo.setAdjustViewBounds(false);
+        logo.setScaleType(ImageView.ScaleType.CENTER);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(100, 49);
+        logoParams.setMargins(0, 0, dp(18), 0);
+        header.addView(logo, logoParams);
 
         TextView title = new TextView(this);
         title.setText("Receipt\nVerification");
