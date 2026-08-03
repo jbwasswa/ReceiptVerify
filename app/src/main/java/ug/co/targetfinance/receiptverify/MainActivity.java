@@ -53,10 +53,12 @@ import java.util.regex.Pattern;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.DecodeHintType;
+import com.google.zxing.LuminanceSource;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.NotFoundException;
 import com.google.zxing.PlanarYUVLuminanceSource;
 import com.google.zxing.Result;
+import com.google.zxing.common.GlobalHistogramBinarizer;
 import com.google.zxing.common.HybridBinarizer;
 
 public class MainActivity extends Activity {
@@ -679,6 +681,8 @@ public class MainActivity extends Activity {
         qrReader = new MultiFormatReader();
         Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
         hints.put(DecodeHintType.POSSIBLE_FORMATS, java.util.Collections.singletonList(BarcodeFormat.QR_CODE));
+        hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
+        hints.put(DecodeHintType.CHARACTER_SET, "UTF-8");
         qrReader.setHints(hints);
     }
 
@@ -797,10 +801,8 @@ public class MainActivity extends Activity {
                 rotatedHeight,
                 false
         );
-        BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
-
         try {
-            Result result = qrReader.decodeWithState(bitmap);
+            Result result = decodeReceiptQr(source);
             qrScanActive = false;
             runOnUiThread(() -> {
                 stopCameraPreview();
@@ -810,6 +812,44 @@ public class MainActivity extends Activity {
         } catch (NotFoundException ex) {
             qrReader.reset();
         }
+    }
+
+    private Result decodeReceiptQr(PlanarYUVLuminanceSource source) throws NotFoundException {
+        try {
+            return decodeSource(source, true);
+        } catch (NotFoundException ignored) {
+            qrReader.reset();
+        }
+
+        try {
+            return decodeSource(source, false);
+        } catch (NotFoundException ignored) {
+            qrReader.reset();
+        }
+
+        int cropWidth = Math.round(source.getWidth() * 0.78f);
+        int cropHeight = Math.round(source.getHeight() * 0.78f);
+        int left = Math.max(0, (source.getWidth() - cropWidth) / 2);
+        int top = Math.max(0, (source.getHeight() - cropHeight) / 2);
+        LuminanceSource centerCrop = source.crop(left, top, cropWidth, cropHeight);
+        try {
+            return decodeSource(centerCrop, true);
+        } catch (NotFoundException ignored) {
+            qrReader.reset();
+        }
+
+        cropWidth = Math.round(source.getWidth() * 0.58f);
+        cropHeight = Math.round(source.getHeight() * 0.58f);
+        left = Math.max(0, (source.getWidth() - cropWidth) / 2);
+        top = Math.max(0, (source.getHeight() - cropHeight) / 2);
+        return decodeSource(source.crop(left, top, cropWidth, cropHeight), true);
+    }
+
+    private Result decodeSource(LuminanceSource source, boolean hybrid) throws NotFoundException {
+        BinaryBitmap bitmap = new BinaryBitmap(hybrid
+                ? new HybridBinarizer(source)
+                : new GlobalHistogramBinarizer(source));
+        return qrReader.decodeWithState(bitmap);
     }
 
     private byte[] rotatePreviewData(byte[] data, int width, int height) {
