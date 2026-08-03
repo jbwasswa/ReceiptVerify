@@ -26,6 +26,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -97,6 +98,7 @@ public class MainActivity extends Activity {
         buildUi();
         configureWebView();
         updateValidationState();
+        showDefaultKeyboard();
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -210,6 +212,10 @@ public class MainActivity extends Activity {
         ));
 
         setContentView(root);
+        getWindow().setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                        | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        );
     }
 
     private View buildHeader() {
@@ -973,6 +979,21 @@ public class MainActivity extends Activity {
         if (keyboard != null) {
             keyboard.hideSoftInputFromWindow(current.getWindowToken(), 0);
         }
+    }
+
+    private void showDefaultKeyboard() {
+        if (ptidInput == null) return;
+
+        ptidInput.postDelayed(() -> {
+            if (inputScreen == null || inputScreen.getVisibility() != View.VISIBLE) return;
+
+            ptidInput.requestFocus();
+            ptidInput.setSelection(ptidInput.getText().length());
+            InputMethodManager keyboard = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (keyboard != null) {
+                keyboard.showSoftInput(ptidInput, InputMethodManager.SHOW_IMPLICIT);
+            }
+        }, 250);
     }
 
     private boolean isOnline() {
